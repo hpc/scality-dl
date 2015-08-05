@@ -1,2 +1,2 @@
 # scality-dl
-This is a space holder for a better description of this project.
+Collection of scripts specifically for starting diskless Scality 4.3.7
