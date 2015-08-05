@@ -1,0 +1,223 @@
+#!/bin/bash
+#
+# Create directory fot all scality drives. (currently 45 drives and 1 SSD)
+#
+# Ron Croonenberg
+# 
+# HPC-3 Los Alamos National Laboratory
+#
+#
+#
+
+nfs_mount="/mnt/dsu-log"
+
+# make sure everything is mounted
+/bin/mount -a
+
+#
+# part one:  create the new fstab
+#
+fstab="/etc/fstab"
+hdu_type="ST4000VN000-1H41"
+ssd_type="INTEL"
+scality_dir="/scality"
+
+
+# Create a /scality dir if we don't have one
+cd /
+
+if [ ! -d "$scality_dir" ]; then
+   mkdir -p $scality_dir
+fi
+
+# find drives and add to the /etc/fstab
+hdu_count=0
+ssd_count=0
+uuid_line=""
+uuid_cmd=""
+
+lsscsi | while read line                                                                 # read all devices
+   do
+      stringarray=($line)
+
+      if [[ ${stringarray[3]} == $hdu_type ]]; then                                    # we found a drive
+         ((hdu_count++))
+
+         uuid_line=$(/sbin/blkid ${stringarray[5]}"1")
+         if [ -z "$uuid_line" ]; then
+            uuid_line=$(/sbin/blkid ${stringarray[5]})
+         fi
+         uuidarray=($uuid_line);
+
+         fs_type=${uuidarray[3]}
+         fs_type=${fs_type:6}
+         fs_type=${fs_type%?}
+
+         dsklbl=${uuidarray[1]}
+         dsklbl=${dsklbl//\"/}
+         echo -e "$dsklbl\t$scality_dir/disk$hdu_count\t$fs_type\tdata=ordered,noauto,noatime,barrier=1\t0\t0" >> $fstab
+
+         if [ ! -d "$scality_dir/disk$hdu_count" ]; then
+            mkdir -p "$scality_dir/disk$hdu_count"
+         fi
+      fi
+      if [[ ${stringarray[3]} == $ssd_type ]]; then                                    # we found a drive
+         ((ssd_count++))
+
+#         uuid_line=$(/sbin/blkid ${stringarray[5]}"1")
+         uuid_line=$(/sbin/blkid /dev/sdssd)
+         uuidarray=($uuid_line);
+
+         fs_type=${uuidarray[3]}
+         fs_type=${fs_type:6}
+         fs_type=${fs_type%?}
+
+         dsklbl=${uuidarray[1]}
+         dsklbl=${dsklbl//\"/}
+         echo -e "$dsklbl\t$scality_dir/ssd$ssd_count\t$fs_type\tdata=ordered,noauto,noatime,barrier=1,discard\t0\t0" >> $fstab
+
+         if [ ! -d "$scality_dir/ssd$ssd_count" ]; then
+            mkdir -p "$scality_dir/ssd$ssd_count"
+         fi
+      fi
+   done
+
+#
+# we need to add a default route, Scality wants one we point it to IB0
+#
+/sbin/route add default gw dsu-dl-master-d ib0
+
+#
+# Part three:  create all the directories and symbolic links
+#
+host_str=$(hostname)
+
+# first fix the scality stafs bug
+cd /usr/local/scality-node/bin
+mv ./bizstorenode ./_bizstorenode
+/bin/cp /root/bizstorenode ./bizstorenode
+
+# create config file
+cd /usr/local/scality-ringsh/ringsh
+/bin/rm config.py
+/bin/ln -s $nfs_mount/$host_str/config.py config.py
+
+
+# Create our remote dir if we don't have one
+if [ ! -d $nfs_mount"/"$host_str ]; then
+   /bin/cp -r $nfs_mount/dsu-dl-template $nfs_mount/$host_str
+fi
+
+# create all /etc/scality-node directories
+if [ ! -d $nfs_mount"/"$host_str"/etc-scality-node" ]; then
+   /bin/mkdir $nfs_mount/$host_str/etc-scality-node
+fi
+for i in `seq 1 12`; do
+   if [ ! -d $nfs_mount"/"$host_str"/etc-scality-node-$i" ]; then
+      /bin/mkdir $nfs_mount/$host_str/etc-scality-node-$i
+   fi
+done
+
+
+# create all symbolic links in /etc for scality and also bizstorenode
+# we can assume that we are in /root
+cd /etc
+
+#
+if [ ! -L "scality-node" ]; then
+   /bin/ln -s  $nfs_mount/$host_str/etc-scality-node scality-node
+fi
+
+for i in `seq 1 12`; do
+   if [ ! -L "scality-node-$i" ]; then
+      /bin/ln -s $nfs_mount/$host_str/etc-scality-node-$i scality-node-$i
+      /bin/ln -s $nfs_mount/$host_str/etc-scality-node-$i bizstorenode_$i
+   fi
+done
+
+# create etc-conf.d and create /etc/conf.d link
+if [ ! -d $nfs_mount"/"$host_str"/etc-conf.d" ]; then
+   /bin/mkdir $nfs_mount/$host_str/etc-conf.d
+fi
+/bin/rm -rf conf.d
+/bin/ln -s $nfs_mount/$host_str/etc-conf.d conf.d
+
+# Now delete the /etc/biziod link and point it to the logger
+/bin/rm -rf biziod
+if [ ! -d $nfs_mount"/"$host_str"/etc-biziod" ]; then
+   /bin/mkdir $nfs_mount/$host_str/etc-biziod
+fi
+/bin/ln -s $nfs_mount/$host_str/etc-biziod biziod
+
+# Some individual files.
+/bin/rm -f sagentd.yaml
+/bin/ln -s $nfs_mount/$host_str/sagentd.yaml sagentd.yaml
+
+/bin/rm -f srebuildd.conf
+/bin/ln -s $nfs_mount/$host_str/srebuildd.conf srebuildd.conf
+
+# and ...  another directory: /var/lib/scality-sagentd
+cd /var/lib
+/bin/rm -rf scality-sagentd
+if [ ! -d $nfs_mount"/"$host_str"/lib-scality-sagentd" ]; then
+   /bin/mkdir $nfs_mount/$host_str/lib-scality-sagentd
+fi
+/bin/ln -s $nfs_mount/$host_str/lib-scality-sagentd scality-sagentd
+
+# and now the /var/lib/scality-node
+/bin/rm -rf scality-node
+if [ ! -d $nfs_mount"/"$host_str"/lib-scality-node" ]; then
+   /bin/mkdir $nfs_mount/$host_str/lib-scality-node
+fi
+/bin/ln -s $nfs_mount/$host_str/lib-scality-node scality-node
+
+# create all /var/log scality-node-n directories
+cd /var/log
+for i in `seq 1 12`; do
+   if [ ! -d $nfs_mount"/"$host_str"/log-scality-node-$i" ]; then
+      /bin/mkdir $nfs_mount/$host_str/log-scality-node-$i
+   fi
+   /bin/rm -rf scality-node-$i
+   /bin/ln -s $nfs_mount/$host_str/log-scality-node-$i scality-node-$i
+done
+
+
+# create a /var/tmp 
+cd /var 
+if [ ! -d $nfs_mount"/"$host_str"/var-tmp" ]; then
+   /bin/mkdir $nfs_mount/$host_str/var-tmp
+fi
+/bin/rm -rf tmp
+ln -s $nfs_mount/$host_str/var-tmp tmp
+
+
+# copy the credentials to /tmp
+/bin/cp /root/scality-installer-credentials /tmp/scality-installer-credentials
+
+# /usr/local/scality-sagentd/modules
+cd /usr/local/scality-sagentd
+/bin/rm -rf modules
+if [ ! -d $nfs_mount"/"$host_str"/local-sagentd" ]; then
+   /bin/mkdir $nfs_mount/$host_str/local-sagentd
+fi
+if [ ! -d $nfs_mount"/"$host_str"/local-sagentd/modules" ]; then
+   /bin/mkdir $nfs_mount/$host_str/local-sagentd/modules
+fi
+/bin/ln -s $nfs_mount/$host_str/local-sagentd/modules modules
+
+
+# /usr/local/scality-ringsh/ringsh/modules
+cd /usr/local/scality-ringsh/ringsh
+/bin/rm -rf modules
+if [ ! -d $nfs_mount"/"$host_str"/local-ringsh-ringsh" ]; then
+   /bin/mkdir $nfs_mount/$host_str/local-ringsh-ringsh
+fi
+if [ ! -d $nfs_mount"/"$host_str"/local-ringsh-ringsh/modules" ]; then
+   /bin/mkdir $nfs_mount/$host_str/local-ringsh-ringsh/modules
+fi
+/bin/ln -s $nfs_mount/$host_str/local-ringsh-ringsh/modules modules
+
+# make cwd /root again
+cd ~
+
+exit 0

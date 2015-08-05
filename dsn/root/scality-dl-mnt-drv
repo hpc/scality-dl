@@ -1,0 +1,89 @@
+#!/bin/bash
+#
+# Create directory fot all scality drives. (currently 45 drives and 1 SSD)
+#
+# Ron Croonenberg
+# 
+# HPC-3 Los Alamos National Laboratory
+#
+#
+
+# make sure everything is mounted
+/bin/mount -a
+
+#
+# part one:  craete the new fstab
+#
+fstab="/etc/fstab"
+hdu_type="ST4000VN000-1H41"
+ssd_type="INTEL"
+scality_dir="/scality"
+
+
+# Create a /scality dir if we don't have one
+cd /
+
+if [ ! -d "$scality_dir" ]; then
+   mkdir -p $scality_dir
+fi
+
+# find drives and add to the /etc/fstab
+hdu_count=0
+ssd_count=0
+uuid_line=""
+uuid_cmd=""
+
+lsscsi | while read line                                                                 # read all devices
+   do
+      stringarray=($line)
+
+      if [[ ${stringarray[3]} == $hdu_type ]]; then                                    # we found a drive
+         ((hdu_count++))
+
+         uuid_line=$(/sbin/blkid ${stringarray[5]}"1")
+         if [ -z "$uuid_line" ]; then
+            uuid_line=$(/sbin/blkid ${stringarray[5]})
+         fi
+         uuidarray=($uuid_line);
+
+         fs_type=${uuidarray[3]}
+         fs_type=${fs_type:6}
+         fs_type=${fs_type%?}
+
+         dsklbl=${uuidarray[1]}
+         dsklbl=${dsklbl//\"/}
+         echo -e "$dsklbl\t$scality_dir/disk$hdu_count\t$fs_type\tdata=ordered,noauto,noatime,barrier=1\t0\t0" >> $fstab
+
+         if [ ! -d "$scality_dir/disk$hdu_count" ]; then
+            mkdir -p "$scality_dir/disk$hdu_count"
+         fi
+      fi
+      if [[ ${stringarray[3]} == $ssd_type ]]; then                                    # we found a drive
+         ((ssd_count++))
+
+#         uuid_line=$(/sbin/blkid ${stringarray[5]}"1")
+         uuid_line=$(/sbin/blkid /dev/sdssd)
+         uuidarray=($uuid_line);
+
+         fs_type=${uuidarray[3]}
+         fs_type=${fs_type:6}
+         fs_type=${fs_type%?}
+
+         dsklbl=${uuidarray[1]}
+         dsklbl=${dsklbl//\"/}
+         echo -e "$dsklbl\t$scality_dir/ssd$ssd_count\t$fs_type\tdata=ordered,noauto,noatime,barrier=1,discard\t0\t0" >> $fstab
+
+         if [ ! -d "$scality_dir/ssd$ssd_count" ]; then
+            mkdir -p "$scality_dir/ssd$ssd_count"
+         fi
+      fi
+   done
+
+
+#
+# we need to add a default route, Scality wants one we point it to IB0
+#
+/sbin/route add default gw dsu-dl-master-d ib0
+
+
+exit 0

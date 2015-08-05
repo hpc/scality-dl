@@ -1,0 +1,20 @@
+#!/bin/bash
+#
+# Create directory fot all scality drives. (currently 45 drives and 1 SSD)
+#
+# Ron Croonenberg
+# 
+# HPC-3 Los Alamos National Laboratory
+#
+#
+
+#
+# part one: find some LANL specific host info
+#
+host_str=$(hostname)
+ibip_addr=$(ip addr | awk '/inet/ && /ib0/{sub(/\/.*$/,"",$2); print $2}')
+eth_addr=$(ip addr | awk '/inet/ && /eth1/{sub(/\/.*$/,"",$2); print $2}')
+
+/usr/local/bin/scality-node-config --nodes 6,6 --disks 45,1 --prefix /scality/disk,/scality/ssd --name `hostname -s`-d,`hostname -s`-m --supervisor-ip 10.10.0.251 --ip $eth_addr --chord-ip ibip_addr --resetconfig
+
+exit 0

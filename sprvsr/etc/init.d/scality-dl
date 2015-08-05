@@ -1,0 +1,50 @@
+#!/bin/bash
+#
+# Create directory fot all scality drives. (currently 45 drives and 1 SSD)
+#
+# Ron Croonenberg
+#
+# HPC-3 Los Alamos National Laboratory
+#
+# Scality diskless node prep
+
+# chkconfig: 345 10 10
+# description: Scality diskless node prep
+#
+# quick and dirty script to prep the machine before starting Scality
+#
+. /etc/rc.d/init.d/functions
+
+if [ -f /etc/sysconfig/scality-dl-prep ]; then
+. /etc/sysconfig/scality-dl-prep
+fi
+
+
+case "$1" in
+start)
+echo "Starting Scality diskless service."
+# make sure EVERYTHING has mounted
+/bin/mount -a
+/root/scality-dl-prep start
+/etc/init.d/scality-supervisor start
+/etc/init.d/scality-sagentd start
+;;
+stop)
+echo "Stopping Scality diskless service."
+#/root/scality-dl-prep stop
+/etc/init.d/scality-supervisor stop
+/etc/init.d/scality-sagentd stop
+;;
+restart)
+echo "Restarting Scality diskless service."
+#/root/scality-dl-prep restart
+/etc/init.d/scality-supervisor stop
+/etc/init.d/scality-sagentd stop
+/etc/init.d/scality-supervisor start
+/etc/init.d/scality-sagentd start
+;;
+*)
+echo "Usage: $0 {start|stop|restart}"
+exit 1
+;;
+esac
