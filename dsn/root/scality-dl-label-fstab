@@ -1,0 +1,71 @@
+#!/bin/bash
+#
+# Create directory fot all scality drives. (currently 45 drives and 1 SSD)
+#
+# Ron Croonenberg
+# 
+# HPC-3 Los Alamos National Laboratory
+#
+#
+#
+
+#
+# part one:  create the new fstab
+#
+fs_type="ext4"
+fstab="/etc/fstab"
+hdu_type="ST4000NC000-1FR1"
+ssd_type="INTEL"
+scality_dir="/scality"
+
+
+# Create a /scality dir if we don't have one
+cd /
+
+if [ ! -d "$scality_dir" ]; then
+   mkdir -p $scality_dir
+fi
+
+# find drives and add to the /etc/fstab
+hdu_count=0
+ssd_count=0
+uuid_line=""
+uuid_cmd=""
+
+lsscsi | while read line                                                                 # read all devices
+   do
+      stringarray=($line)
+
+      if [[ ${stringarray[3]} == $hdu_type ]]; then                                    # we found a drive
+         ((hdu_count++))
+         if [ ! -d "$scality_dir/disk$hdu_count" ]; then
+            /bin/mkdir -p "$scality_dir/disk$hdu_count"
+         fi
+         uuid_line=$(/sbin/blkid ${stringarray[5]}"1")
+      elif [[ ${stringarray[3]} == $ssd_type ]]; then
+         ((ssd_count++))
+         if [ ! -d "$scality_dir/ssd$ssd_count" ]; then
+            mkdir -p "$scality_dir/ssd$ssd_count"
+         fi
+         uuid_line=$(/sbin/blkid ${stringarray[6]}"1")
+      fi
+      uuidarray=($uuid_line);
+
+      prefix="LABEL"                                  # these are drives
+      if [[ "${uuidarray[1]}" =~ "$prefix" ]]; then
+         dsk_uuid=${uuidarray[1]}
+         dsk_uuid=${dsk_uuid//\"/}
+
+         if [[ ${stringarray[3]} == $hdu_type ]]; then                                    # we found a drive
+            echo -e "$dsk_uuid\t$scality_dir/disk$hdu_count\t$fs_type\tdata=ordered,noauto,noatime,barrier=1\t0\t0" >> $fstab
+            echo -e "$dsk_uuid\t$scality_dir/disk$hdu_count\t$fs_type\tdata=ordered,noauto,noatime,barrier=1\t0\t0"
+         elif [[ ${stringarray[3]} == $ssd_type ]]; then
+            echo -e "$dsk_uuid\t$scality_dir/ssd$ssd_count\t$fs_type\tdata=ordered,noauto,noatime,barrier=1,discard\t0\t0" >> $fstab
+            echo -e "$dsk_uuid\t$scality_dir/ssd$ssd_count\t$fs_type\tdata=ordered,noauto,noatime,barrier=1,discard\t0\t0"
+         fi
+      else
+         echo -e "UNLABELED DRIVE!!: $line"
+      fi
+   done
+
+exit 0

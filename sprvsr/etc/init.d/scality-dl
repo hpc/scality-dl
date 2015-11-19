@@ -13,6 +13,9 @@
 #
 # quick and dirty script to prep the machine before starting Scality
 #
+
+nfs_mount="/mnt/scal-nfs"
+
 . /etc/rc.d/init.d/functions
 
 if [ -f /etc/sysconfig/scality-dl-prep ]; then
@@ -23,9 +26,20 @@ fi
 case "$1" in
 start)
 echo "Starting Scality diskless service."
-# make sure EVERYTHING has mounted
-/bin/mount -a
+
+# check and see if scal-nfs is mounted, if not ...  try to  if fail..  abort
+mounted=$(/bin/mount | grep scal-nfs | wc -l)
+if [ $mounted -eq 0 ]; then
+    /bin/mount $nfs_mount
+    mounted=$(/bin/mount | grep scal-nfs | wc -l)
+    if [ $mounted -eq 0 ]; then
+       echo "Error: scal-nfs not available. Aborting..."
+       exit -1
+    fi
+fi
+
 /root/scality-dl-prep start
+/etc/init.d/httpd start
 /etc/init.d/scality-supervisor start
 /etc/init.d/scality-sagentd start
 ;;
@@ -34,10 +48,13 @@ echo "Stopping Scality diskless service."
 #/root/scality-dl-prep stop
 /etc/init.d/scality-supervisor stop
 /etc/init.d/scality-sagentd stop
+/etc/init.d/httpd stop
 ;;
 restart)
 echo "Restarting Scality diskless service."
 #/root/scality-dl-prep restart
+/etc/init.d/httpd stop
+/etc/init.d/httpd start
 /etc/init.d/scality-supervisor stop
 /etc/init.d/scality-sagentd stop
 /etc/init.d/scality-supervisor start

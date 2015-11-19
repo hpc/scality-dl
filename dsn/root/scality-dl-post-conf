@@ -8,6 +8,8 @@
 #
 #
 
+nfs_mount="/mnt/scal-nfs"
+
 # Make sure everything is mounted.
 /bin/mount -a
 
@@ -16,74 +18,66 @@
 #
 host_str=$(hostname)
 
-# Create our remote dir if we don't have one
-if [ ! -d "/mnt/dsu-log/$host_str" ]; then
-   /bin/cp -r /mnt/dsu-log/dsu-dl-template /mnt/dsu-log/$host_str
-fi
-
-# save the sagentd.yaml file
-/bin/cp -f /etc/sagentd.yaml /mnt/dsu-log/$host_str/sagentd.yaml
-
 # the /etc/scality-node directory
-if [ -d "/mnt/dsu-log/$host_str/etc-scality-node" ]; then
-   /bin/rm -rf /mnt/dsu-log/$host_str/etc-scality-node
+if [ -d "$nfs_mount/$host_str/etc-scality-node" ]; then
+   /bin/rm -rf $nfs_mount/$host_str/etc-scality-node
 fi
-/bin/mkdir /mnt/dsu-log/$host_str/etc-scality-node
-/bin/cp -rf /etc/scality-node/* /mnt/dsu-log/$host_str/etc-scality-node 2>/dev/null
+/bin/mkdir $nfs_mount/$host_str/etc-scality-node
+/bin/cp -rf /etc/scality-node/* $nfs_mount/$host_str/etc-scality-node 2>/dev/null
 
 # copy all other scality node directories
 for i in `seq 1 12`; do
-   if [ -d "/mnt/dsu-log/$host_str/etc-scality-node-$i" ]; then
-      /bin/rm -rf /mnt/dsu-log/$host_str/etc-scality-node-$i
+   if [ -d "$nfs_mount/$host_str/etc-scality-node-$i" ]; then
+      /bin/rm -rf $nfs_mount/$host_str/etc-scality-node-$i
    fi
-   /bin/mkdir /mnt/dsu-log/$host_str/etc-scality-node-$i
-   /bin/cp -rf /etc/scality-node-$i/* /mnt/dsu-log/$host_str/etc-scality-node-$i 2>/dev/null
+   /bin/mkdir $nfs_mount/$host_str/etc-scality-node-$i
+   /bin/cp -rf /etc/scality-node-$i/* $nfs_mount/$host_str/etc-scality-node-$i 2>/dev/null
 done
 
 # /var/lib/scality-sagentd
-if [ -d "/mnt/dsu-log/$host_str/lib-scality-sagentd" ]; then
-   /bin/rm -rf /mnt/dsu-log/$host_str/lib-scality-sagentd
+if [ -d "$nfs_mount/$host_str/lib-scality-sagentd" ]; then
+   /bin/rm -rf $nfs_mount/$host_str/lib-scality-sagentd
 fi
-/bin/mkdir /mnt/dsu-log/$host_str/lib-scality-sagentd
-/bin/cp -rf /var/lib/scality-sagentd/* /mnt/dsu-log/$host_str/lib-scality-sagentd 2>/dev/null
+/bin/mkdir $nfs_mount/$host_str/lib-scality-sagentd
+/bin/cp -rf /var/lib/scality-sagentd/* $nfs_mount/$host_str/lib-scality-sagentd 2>/dev/null
 
 # and now the /var/lib/scality-node
-if [ -d "/mnt/dsu-log/$host_str/lib-scality-node" ]; then
-   /bin/rm -rf /mnt/dsu-log/$host_str/lib-scality-node
+if [ -d "$nfs_mount/$host_str/lib-scality-node" ]; then
+   /bin/rm -rf $nfs_mount/$host_str/lib-scality-node
 fi
-/bin/mkdir /mnt/dsu-log/$host_str/lib-scality-node
-/bin/cp -rf /var/lib/scality-node/* /mnt/dsu-log/$host_str/lib-scality-node 2>/dev/null
+/bin/mkdir $nfs_mount/$host_str/lib-scality-node
+/bin/cp -rf /var/lib/scality-node/* $nfs_mount/$host_str/lib-scality-node 2>/dev/null
 
 
 # /etc/srebuildd.conf
-/bin/cp -f /etc/srebuildd.conf /mnt/dsu-log/$host_str/srebuildd.conf
+#/bin/cp -f /etc/srebuildd.conf /mnt/dsu-log/$host_str/srebuildd.conf
 
 # /etc/biziod
-if [ -d "/mnt/dsu-log/$host_str/etc-biziod" ]; then
-   /bin/rm -rf /mnt/dsu-log/$host_str/etc-biziod
+if [ -d "$nfs_mount/$host_str/etc-biziod" ]; then
+   /bin/rm -rf $nfs_mount/$host_str/etc-biziod
 fi
-/bin/mkdir /mnt/dsu-log/$host_str/etc-biziod
-/bin/cp -rf /etc/biziod/* /mnt/dsu-log/$host_str/etc-biziod
+/bin/mkdir $nfs_mount/$host_str/etc-biziod
+/bin/cp -rf /etc/biziod/* $nfs_mount/$host_str/etc-biziod
 
 # /usr/local/scality-sagentd/modules
-if [ -d "/mnt/dsu-log/$host_str/local-sagentd/modules" ]; then
-   /bin/rm -rf /mnt/dsu-log/$host_str/local-sagentd/modules
+if [ -d "$nfs_mount/$host_str/local-sagentd/modules" ]; then
+   /bin/rm -rf $nfs_mount/$host_str/local-sagentd/modules
 fi
-if [ ! -d "/mnt/dsu-log/$host_str/local-sagentd" ]; then
-   /bin/mkdir /mnt/dsu-log/$host_str/local-sagentd
+if [ ! -d "$nfs_mount/$host_str/local-sagentd" ]; then
+   /bin/mkdir $nfs_mount/$host_str/local-sagentd
 fi
-/bin/mkdir /mnt/dsu-log/$host_str/local-sagentd/modules
-/bin/cp -rf /usr/local/scality-sagentd/modules/* /mnt/dsu-log/$host_str/local-sagentd/modules
+/bin/mkdir $nfs_mount/$host_str/local-sagentd/modules
+/bin/cp -rf /usr/local/scality-sagentd/modules/* $nfs_mount/$host_str/local-sagentd/modules
 
 # /usr/local/scality-ringsh/ringsh/modules
-if [ -d "/mnt/dsu-log/$host_str/local-ringsh-ringsh/modules" ]; then
-   /bin/rm -rf /mnt/dsu-log/$host_str/local-ringsh-ringsh/modules
+if [ -d "$nfs_mount/$host_str/local-ringsh-ringsh/modules" ]; then
+   /bin/rm -rf $nfs_mount/$host_str/local-ringsh-ringsh/modules
 fi
-if [ ! -d "/mnt/dsu-log/$host_str/local-ringsh-ringsh" ]; then
-   /bin/mkdir /mnt/dsu-log/$host_str/local-ringsh-ringsh
+if [ ! -d "$nfs_mount/$host_str/local-ringsh-ringsh" ]; then
+   /bin/mkdir $nfs_mount/$host_str/local-ringsh-ringsh
 fi
-/bin/mkdir /mnt/dsu-log/$host_str/local-ringsh-ringsh/modules
-/bin/cp -rf /usr/local/scality-ringsh/ringsh/modules/* /mnt/dsu-log/$host_str/local-ringsh-ringsh/modules
+/bin/mkdir $nfs_mount/$host_str/local-ringsh-ringsh/modules
+/bin/cp -rf /usr/local/scality-ringsh/ringsh/modules/* $nfs_mount/$host_str/local-ringsh-ringsh/modules
 
 
 exit 0

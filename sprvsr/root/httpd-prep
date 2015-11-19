@@ -1,0 +1,20 @@
+#!/bin/bash
+#
+# Create directories for HTTPD logs
+#
+# Ron Croonenberg
+#
+# HPC-3 Los Alamos National Laboratory
+#
+#
+#
+nfs_mount="/mnt/scal-nfs"
+host_str=$(hostname)
+
+/bin/mkdir -p $nfs_mount/scality-logs/httpd
+
+touch $nfs_mount/scality-logs/httpd/"$host_str"_access_log
+touch $nfs_mount/scality-logs/httpd/"$host_str"_error_log
+touch $nfs_mount/scality-logs/httpd/"$host_str"_ssl_error_log
+touch $nfs_mount/scality-logs/httpd/"$host_str"_ssl_access_log
+touch $nfs_mount/scality-logs/httpd/"$host_str"_ssl_request_log

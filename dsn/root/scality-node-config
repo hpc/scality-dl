@@ -3,18 +3,44 @@
 # Create directory fot all scality drives. (currently 45 drives and 1 SSD)
 #
 # Ron Croonenberg
-# 
+#
 # HPC-3 Los Alamos National Laboratory
 #
 #
 
 #
-# part one: find some LANL specific host info
+# part one: save the configs!!
 #
 host_str=$(hostname)
-ibip_addr=$(ip addr | awk '/inet/ && /ib0/{sub(/\/.*$/,"",$2); print $2}')
-eth_addr=$(ip addr | awk '/inet/ && /eth1/{sub(/\/.*$/,"",$2); print $2}')
+dataip_addr=$(ip addr | awk '/inet/ && /ib0/{sub(/\/.*$/,"",$2); print $2}')
+eth_addr=$(ip addr | awk '/inet/ && /eth0/{sub(/\/.*$/,"",$2); print $2}')
 
-/usr/local/bin/scality-node-config --nodes 6,6 --disks 45,1 --prefix /scality/disk,/scality/ssd --name `hostname -s`-d,`hostname -s`-m --supervisor-ip 10.10.0.251 --ip $eth_addr --chord-ip ibip_addr --resetconfig
+echo "data: "$dataip_addr
+echo "host: "$eth_addr
+
+# standard ring, data and meta
+#/usr/local/bin/scality-node-config --nodes 6,6 --disks 84,2 --prefix /scality/disk,/scality/ssd --name `hostname -s`-d,`hostname -s`-m --supervisor-ip 10.10.0.251 --ip $eth_addr --chord-ip $dataip_addr --resetconfig
+
+#
+# 48 node open science data ring only
+#
+/usr/local/bin/scality-node-config --nodes 1,1,1,1,1,1 --disks 14,14,14,14,14,14 --prefix /scality/disk,/scality/disk,/scality/disk,/scality/disk,/scality/disk,/scality/disk --name `hostname -s`-d,`hostname -s`-d,`hostname -s`-d,`hostname -s`-d,`hostname -s`-d,`hostname -s`-d --supervisor-ip 10.10.0.251 --ip $eth_addr --chord-ip $dataip_addr --resetconfig
+
+# Now copy everything....
+echo "Copying and saving all scality configurations"
+./scality-dl-post-conf
+
+
+# 
+# Open Science indexes go to SSDs
+#
+for j in `seq 42`
+   do
+      echo "nvp=/scality/ssd1/bizobj-disk$j" >> /mnt/scal-nfs/$host_str/etc-biziod/bizobj.disk$j
+   done
+for j in `seq 43 84`
+   do
+      echo "nvp=/scality/ssd2/bizobj-disk$j" >> /mnt/scal-nfs/$host_str/etc-biziod/bizobj.disk$j
+   done
 
 exit 0

@@ -8,24 +8,41 @@
 #
 #
 #
+d_drives=84
+m_drives=2
 
-nfs_mount="/mnt/dsu-log"
 
-# make sure everything is mounted
-/bin/mount -a
+
+
+nfs_mount="/mnt/scal-nfs"
+
+# make sure everything in fstab is mounted
+/bin/mount $nfs_mount
+
+# create mount points and mount SSDs
+for i in `seq $m_drives`;
+   do
+      if [ ! -d "$scality_dir/ssd$i" ]; then
+         /bin/mkdir -p /scality/ssd$i
+      fi;
+
+      ssd_mnt=`mount | grep ssd$i | wc -l`
+      if [ $ssd_mnt -eq 0 ]; then
+         /bin/mount /scality/ssd$i
+      fi
+   done
+
 
 
 # make sure the time is running correctly:
 /sbin/service ntpd stop
-/usr/sbin/ntpdate dsu-dl-master
+/usr/sbin/ntpdate sdsu-master
 /sbin/service ntpd start
 
 #
 # part one:  create the new fstab
 #
 fstab="/etc/fstab"
-hdu_type="ST4000VN000-1H41"
-ssd_type="INTEL"
 scality_dir="/scality"
 
 
@@ -36,24 +53,23 @@ if [ ! -d "$scality_dir" ]; then
    mkdir -p $scality_dir
 fi
 
-# create 45 mounting points
+# create 84 mounting points
 CNT=1
-while [  $CNT -lt 46 ]; do
+d_drives=$((d_drives + 1))
+while [  $CNT -lt $d_drives ]; do
    if [ ! -d "$scality_dir/disk$CNT" ]; then
-      /bin/mkdir /scality/disk$CNT
-#      echo "/scality/disk$CNT"
+      /bin/mkdir -p /scality/disk$CNT
    fi
    let CNT=CNT+1
    done
 
-# and the SSD
-if [ ! -d "$scality_dir/ssd1" ]; then
-   /bin/mkdir /scality/ssd1
-fi
 #
 # we need to add a default route, Scality wants one we point it to IB0
 #
-/sbin/route add default gw dsu-dl-master-d ib0
+route_exist=`ip route show | grep default | wc -l`
+if [ $route_exist -eq 0 ]; then
+   /sbin/route add default gw sdsu-master-d ib0
+fi
 
 #
 # Part three:  create all the directories and symbolic links
@@ -61,24 +77,30 @@ fi
 host_str=$(hostname)
 
 # first fix the scality stafs bug
-cd /usr/local/scality-node/bin
-mv ./bizstorenode ./_bizstorenode
-/bin/cp /root/bizstorenode ./bizstorenode
+#cd /usr/local/scality-node/bin
+#mv ./bizstorenode ./_bizstorenode
+#/bin/cp /root/bizstorenode ./bizstorenode
+
+# Create our remote 'home dir' if we don't have one
+if [ ! -d $nfs_mount"/"$host_str ]; then
+   /bin/mkdir $nfs_mount/$host_str
+fi
 
 # create config file
 cd /usr/local/scality-ringsh/ringsh
 /bin/rm config.py
+if [ ! -f $nfs_mount"/"$host_str/config.py ]; then
+   /bin/touch $nfs_mount"/"$host_str/config.py
+fi
 /bin/ln -s $nfs_mount/$host_str/config.py config.py
 
 
-# Create our remote dir if we don't have one
-if [ ! -d $nfs_mount"/"$host_str ]; then
-   /bin/cp -r $nfs_mount/dsu-dl-template $nfs_mount/$host_str
-fi
-
 # create all /etc/scality-node directories
 if [ ! -d $nfs_mount"/"$host_str"/etc-scality-node" ]; then
-   /bin/mkdir $nfs_mount/$host_str/etc-scality-node
+   /bin/mkdir -p $nfs_mount/$host_str/etc-scality-node
+fi
+if [ ! -d $nfs_mount"/"$host_str"/etc-scality-node/backup" ]; then
+   /bin/mkdir -p $nfs_mount/$host_str/etc-scality-node/backup
 fi
 for i in `seq 1 12`; do
    if [ ! -d $nfs_mount"/"$host_str"/etc-scality-node-$i" ]; then
@@ -89,26 +111,37 @@ done
 
 # remove mod_security from apache 
 /bin/rm -rf /etc/httpd/conf.d/mod_security.conf
+/bin/rm -rf /etc/httpd/modules/mod_security2.so
 
 # create all symbolic links in /etc for scality and also bizstorenode
 # we can assume that we are in /root
 cd /etc/httpd/logs
 /bin/rm -rf fastcgi
 if [ ! -d $nfs_mount"/"$host_str"/etc-http-logs/fastcgi" ]; then
-   /bin/mkdir $nfs_mount/$host_str/etc-http-logs/fastcgi
+   /bin/mkdir -p $nfs_mount/$host_str/etc-http-logs/fastcgi
+   /bin/chown -R apache.apache $nfs_mount/$host_str/etc-http-logs/fastcgi
 fi
-ln -s $nfs_mount/$host_str/etc-http-logs/fastcgi fastcgi
+/bin/ln -s $nfs_mount/$host_str/etc-http-logs/fastcgi fastcgi
+
 
 cd /etc
 # point to sproxyd on NFS
-if [ ! -L "sproxyd.conf" ]; then
-   /bin/rm sproxyd.conf
-   /bin/ln -s $nfs_mount/dsu-dl-common/sproxyd.conf sproxyd.conf
+/bin/rm sproxyd.conf
+if [ ! -d $nfs_mount"/"$host_str ]; then
+   /bin/mkdir -p $nfs_mount"/"$host_str
 fi
+if [ ! -f $nfs_mount"/"$host_str"/sproxyd.conf" ]; then
+   /bin/touch $nfs_mount/$host_str/sproxyd.conf
+fi
+/bin/ln -s $nfs_mount/$host_str/sproxyd.conf sproxyd.conf
 
-#
+
+# create all the bizstorenode links, they point all to the scality-node dirs.
 if [ ! -L "scality-node" ]; then
    /bin/ln -s  $nfs_mount/$host_str/etc-scality-node scality-node
+fi
+if [ ! -L "bizstorenode" ]; then
+   /bin/ln -s $nfs_mount/$host_str/etc-scality-node bizstorenode
 fi
 
 for i in `seq 1 12`; do
@@ -117,6 +150,7 @@ for i in `seq 1 12`; do
       /bin/ln -s $nfs_mount/$host_str/etc-scality-node-$i bizstorenode_$i
    fi
 done
+
 
 # create etc-conf.d and create /etc/conf.d link
 if [ ! -d $nfs_mount"/"$host_str"/etc-conf.d" ]; then
@@ -134,12 +168,16 @@ fi
 
 # Some individual files.
 /bin/rm -f sagentd.yaml
+if [ ! -f $nfs_mount"/"$host_str"/sagentd.yaml" ]; then
+   /bin/touch $nfs_mount"/"$host_str/sagentd.yaml
+fi
 /bin/ln -s $nfs_mount/$host_str/sagentd.yaml sagentd.yaml
 
+if [ ! -f $nfs_mount"/"$host_str"/srebuildd.conf" ]; then
+   /bin/cp -f srebuildd.conf $nfs_mount/$host_str/srebuildd.conf
+fi
 /bin/rm -f srebuildd.conf
 /bin/ln -s $nfs_mount/$host_str/srebuildd.conf srebuildd.conf
-
-
 
 
 # and ...  other directories: /var/lib/.....

@@ -1,0 +1,13 @@
+#!/bin/bash
+#
+# Create directory fot all scality drives. (currently 45 drives and 1 SSD)
+#
+# Ron Croonenberg
+#
+# HPC-3 Los Alamos National Laboratory
+#
+#
+
+./scality-auto-build-disks.sh -X -B 16 -s 4000787030016 -p /scality/disk -y
+
+exit 0

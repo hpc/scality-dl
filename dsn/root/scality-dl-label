@@ -1,0 +1,31 @@
+#!/bin/bash
+#
+# Create labels for all scality data drives.
+#
+# Ron Croonenberg
+#
+# HPC-3 Los Alamos National Laboratory
+#
+#
+#
+
+cnt=0                                                   # data drive counter
+lsscsi | while read line                                # read all scsi devices
+   do
+      stringarray=($line)                               # make a list
+
+      prefix="/dev/sdssd"                                  # these are drives
+      drive=${stringarray[5]}                           # this is a potential drive
+
+      if [[ ! "$drive" =~ "$prefix" ]]; then
+         prefix="/dev/sd"
+         if [[ "$drive" =~ "$prefix" ]]; then
+            let cnt=cnt+1                               # found a drive numver it and ...
+            echo "e2label "$drive"1 SCALDISK"$cnt 
+            e2label "$drive"1 SCALDISK$cnt              #                             ... label it.
+         fi
+      fi
+
+   done
+
+exit 0

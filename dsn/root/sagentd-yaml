@@ -1,0 +1,47 @@
+#!/bin/bash
+#
+# Create directory fot all scality drives. (currently 45 drives and 1 SSD)
+#
+# Ron Croonenberg
+#
+# HPC-3 Los Alamos National Laboratory
+#
+#
+
+yaml_file="/etc/sagentd.yaml"
+sprvsr="10.10.0.251"
+d_port=8084
+m_port=8090
+
+
+
+host_str=$(hostname)
+ip_addr=`getent hosts $host_str-d | cut -d' ' -f1`
+
+echo "daemon_poll_period: 5" > $yaml_file
+echo "daemons:" >> $yaml_file
+
+for (( node=1; node<=6; node++ ))
+   do
+      echo "  "$host_str"-d-d"$node":" >> $yaml_file
+      echo "    address: "$ip_addr >> $yaml_file
+      echo "    port: "$((d_port + node -1)) >> $yaml_file
+      echo "    ssl: 0" >> $yaml_file
+      echo "    type: node" >> $yaml_file
+   done
+
+#for (( node=1; node<=6; node++ ))
+#   do
+#      echo "  "$host_str"-d-m"$node":" >> $yaml_file
+#      echo "    address: "$ip_addr >> $yaml_file
+#      echo "    port: "$((m_port + node -1)) >> $yaml_file
+#      echo "    ssl: 0" >> $yaml_file
+#      echo "    type: node" >> $yaml_file
+#   done
+echo "ip_whitelist:" >> $yaml_file
+echo "- localhost" >> $yaml_file
+echo "- "$sprvsr >> $yaml_file
+echo "port: 7084" >> $yaml_file
+echo "snmp_file: /var/lib/scality-sagentd/oidlist.txt" >> $yaml_file
+echo "snmp_update_period: 5" >> $yaml_file
+echo "spass: admin" >> $yaml_file
